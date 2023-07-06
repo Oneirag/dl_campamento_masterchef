@@ -34,6 +34,7 @@ def main(force_download=False, subdir_name="images"):
     if req.status >= 400:
         logger.error(f"Error connecting to {url_post}")
         return
+    req.url = url_post  # Just in case protocol and host are deleted, use full url of the post
     ck = get_cookies(req)
     headers = cookies2header(ck)
     # Read article list
