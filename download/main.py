@@ -25,29 +25,27 @@ def main(force_download=False, subdir_name="images"):
     camp_name = get_last_name_url(url)
     # First request: get page, find submit form and extract URL from it
     first_req = http.request("get", url)
-    first_req_soup = BeautifulSoup(first_req.data, "html.parser")
+    first_req.raise_for_status()
+    first_req_soup = BeautifulSoup(first_req, "html.parser")
     url_post = first_req_soup.body.find("form").attrs['action']
     # Next: do login and get cookie
     logger.debug(f"Logging in {url_post}")
-    req = http.request("post", url_post, fields={"post_password": passwd, "submit": "Enter"})
+    req = http.request("post", url_post, data={"post_password": passwd, "Submit": "Enter", "redirect_to": url})
     # req_bad = http.request("post", url_post, fields={"post_password": passwd + "hola", "submit": "Enter"})
-    if req.status >= 400:
+    if req.status_code >= 400:
         logger.error(f"Error connecting to {url_post}")
         return
-    req.url = url_post  # Just in case protocol and host are deleted, use full url of the post
-    ck = get_cookies(req)
-    headers = cookies2header(ck)
     # Read article list
     logger.info(f"Reading article list for {camp_name}")
-    req_article_list = http.request("get", url, headers=headers)
-    soup_article_list = BeautifulSoup(req_article_list.data, 'html.parser')
+    req_article_list = http.request("get", url)
+    soup_article_list = BeautifulSoup(req_article_list, 'html.parser')
     # Iterate in article list to navigate to each
     for article in soup_article_list.find("article").findAll("a", class_="title"):
         href = article.attrs['href']
         article_name = href.split("/")[-2]
         logger.info(f"Reading article: {article_name}")
-        req_article = http.request("get", href, headers=headers)
-        img_soup = BeautifulSoup(req_article.data, "html.parser")
+        req_article = http.request("get", href)
+        img_soup = BeautifulSoup(req_article, "html.parser")
         # Get images of the article and download everyone
         article_text = img_soup.find("main").find(class_="entry-content").text.strip()
         for img in img_soup.find("main").find_all("img"):
@@ -60,12 +58,12 @@ def main(force_download=False, subdir_name="images"):
                 img_name = img_url.split("/")[-1]
                 img_filename = os.path.join(img_dir, img_name)
                 if not os.path.isfile(img_filename) or force_download:
-                    req_img = http.request("get", img_url, headers=headers)
+                    req_img = http.request("get", img_url)
                     img_name = img_url.split("/")[-1]
                     # Save image
                     logger.info(f"processing {img_url} to {img_filename}")
                     with open(img_filename, "wb") as f:
-                        f.write(req_img.data)
+                        f.write(req_img.content)
                 else:
                     logger.info(f"Skipping {img_name}: already downloaded")
             # save description (if not previously saved)
